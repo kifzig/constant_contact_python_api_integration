@@ -11,89 +11,89 @@ from urllib.parse import parse_qs
 from decouple import config
 
 import base64
+import pandas as pd
 
-SCOPE = "campaign_data" #will change depending on call - notice scope in api docs
-STATE = "l123okdsk1kl" #state is arbitrary
+SCOPE = "campaign_data"  # will change depending on call - notice scope in api docs
+STATE = "l123okdsk1kl"  # state is arbitrary
 
-#chromedriver.exe downloaded to use Selenium - stored locally
+# chromedriver.exe downloaded to use Selenium - stored locally
 driverService = Service('C:/Users/Kif/Desktop/chromedriver_win32/chromedriver.exe')
 driver = webdriver.Chrome(service=driverService)
 
-#This information is from constantcontact.com - you must register the application for a key and client secret
-#https://v3.developer.constantcontact.com/api_guide/getting_started.html
+# This information is from constantcontact.com - you must register the application for a key and client secret
+# https://v3.developer.constantcontact.com/api_guide/getting_started.html
 CLIENT_ID_API_KEY = config('CLIENT_ID')
 CLIENT_SECRET = config('CLIENT_SECRET')
 REDIRECT_URL = config('REDIRECT_URL')
-CC_EMAIL = config('EMAIL') #Email used to login to constantcontact.com
-CC_PASSWORD = config('PASSWORD') #Password used for constantcontact.com
+CC_EMAIL = config('EMAIL')  # Email used to login to constantcontact.com
+CC_PASSWORD = config('PASSWORD')  # Password used for constantcontact.com
 
 
+# This application sends GET requests to https://authz.constantcontact.com/oauth2/default/v1/authorize to initiate authorization requests.
+# This application sends POST requests to https://authz.constantcontact.com/oauth2/default/v1/token to exchange authorization codes for bearer tokens.
+# It follows the outline of authentication details below on the Constant Contact API guide:
 
-
-
-#This application sends GET requests to https://authz.constantcontact.com/oauth2/default/v1/authorize to initiate authorization requests.
-#This application sends POST requests to https://authz.constantcontact.com/oauth2/default/v1/token to exchange authorization codes for bearer tokens.
-#It follows the outline of authentication details below on the Constant Contact API guide:
-
-#OAuth2 Authorization Code Flow
-#https://v3.developer.constantcontact.com/api_guide/server_flow.html
+# OAuth2 Authorization Code Flow
+# https://v3.developer.constantcontact.com/api_guide/server_flow.html
 
 def getAuthorizationURL():
     baseURL = "https://authz.constantcontact.com/oauth2/default/v1/authorize"
     authURL = baseURL + "?client_id=" + CLIENT_ID_API_KEY + "&scope=" + SCOPE + "+offline_access&response_type=code&redirect_uri=" + REDIRECT_URL + "&state=" + STATE
-    #print(authURL)
-    #print(type(authURL))
-    return(authURL)
+    # print(authURL)
+    # print(type(authURL))
+    return (authURL)
 
 
 def parse_code_from_URL(returned_url):
     parsed_url = urlparse(returned_url)
     code = parse_qs(parsed_url.query)['code'][0]
-    return(code)
+    return (code)
 
 
 def parse_state_from_URL(returned_url):
     parsed_url = urlparse(returned_url)
     state = parse_qs(parsed_url.query)['state'][0]
-    return(state)
+    return (state)
+
 
 def get_access_token(code):
-    #create request URL
+    # create request URL
     baseURL = "https://authz.constantcontact.com/oauth2/default/v1/token"
 
-    #Base64 Encode the String client_id:client_secret for Authorization header
+    # Base64 Encode the String client_id:client_secret for Authorization header
     auth_string = CLIENT_ID_API_KEY + ":" + CLIENT_SECRET
     auth_string_bytes = auth_string.encode("ascii")
     auth_base64_bytes = base64.b64encode(auth_string_bytes)
     auth_base64_string = auth_base64_bytes.decode("ascii")
-    #print(f"Encoded string: {auth_base64_string}")
+    # print(f"Encoded string: {auth_base64_string}")
 
     headers = {"Content-type": "application/x-www-form-urlencoded",
                "Accept": "application/json",
                "Authorization": "Basic " + auth_base64_string}
     params = {"code": code,
               "redirect_uri": REDIRECT_URL,
-              "grant_type": "authorization_code"} #required -- always authorization_code
+              "grant_type": "authorization_code"}  # required -- always authorization_code
     r = requests.post(baseURL, headers=headers, params=params)
     json_token_info = r.text
-    json_token_info = eval(json_token_info) #converts string to json
+    json_token_info = eval(json_token_info)  # converts string to json
     return json_token_info.get("access_token")
+
 
 def get_authorization_token_header(access_token):
     bearer_token = "Bearer " + access_token
-    #headers = {"Content-type": "application/x-www-form-urlencoded",
+    # headers = {"Content-type": "application/x-www-form-urlencoded",
     headers = {"Content-type": "application/json",
                "Accept": "application/json",
-                "Authorization" : bearer_token}
+               "Authorization": bearer_token}
     return headers
 
 
-#Step 1: Create an authorization request
+# Step 1: Create an authorization request
 authURL = getAuthorizationURL()
 
 response = requests.get(authURL)
 if response.history:
-    #Uncomment below for help with troubleshooting
+    # Uncomment below for help with troubleshooting
     # print("Request was redirected.")
     # for resp in response.history:
     #     print(resp.status_code, "URL: ",  resp.url)
@@ -106,15 +106,14 @@ if response.history:
     password = driver.find_element(By.ID, "okta-signin-password").send_keys(CC_PASSWORD + Keys.ENTER)
     time.sleep(7)
 
-    #Get the authorization code
+    # Get the authorization code
     url_with_code = driver.current_url
     code = parse_code_from_URL(url_with_code)
     state = parse_state_from_URL(url_with_code)
 
     token_header = get_authorization_token_header(get_access_token(code))
     driver.quit()
-    #print(token_header)
-
+    # print(token_header)
 
     ##Get User Privileges - 1st API Request GET - These work, but need to be uncommented
     # user_priv_URL = "https://api.cc.email/v3/account/user/privileges"
@@ -128,7 +127,7 @@ if response.history:
     # print('ACCOUNT SUMMARY DETAILS')
     # print(r.text)
 
-    #Create a contact list - Scope is contact_data
+    # Create a contact list - Scope is contact_data
     # list_input = {"name": "Delete this List",
     #               "favorite": False,
     #               "description": "Constant Contant API List Test"}
@@ -143,8 +142,7 @@ if response.history:
     # r_del = requests.delete(del_list_url, headers=token_header)
     # #print(r_del.text)
 
-
-    #Get Contacts Collection - scope is contact_data
+    # Get Contacts Collection - scope is contact_data
     # get_contacts_URL = "https://api.cc.email/v3/contacts"
     # get_contacts_response = requests.get(get_contacts_URL, headers=token_header, params={"limit": 50})
     # #print(get_contacts_response.text)
@@ -156,15 +154,34 @@ if response.history:
     # print(camp_response.text)
     # print(camp_response.status_code)
 
-    #Get a Collection of Email Campaigns
+    # Get a Collection of Email Campaigns
     campaigns_url = "https://api.cc.email/v3/emails"
-    campaigns_list = requests.get(campaigns_url, headers=token_header)
+    campaigns_list = requests.get(campaigns_url, headers=token_header,
+                                  params={"after_date": "2022-06-30T11:42:57.000Z"})
     print(campaigns_list.text)
+    campaigns_data = campaigns_list.json()
+
+    i = 0
+    while campaigns_data["campaigns"][i]:
+        print(i, campaigns_data["campaigns"][i]["campaign_id"])
+        i += 1
+        try:
+            campaigns_data["campaigns"][i]
+        except IndexError:
+            break
+        else:
+            continue
+
+
+
+    column_names = ["campaign_id", "created_at", "current_status", "name", "type", "type_code", "updated_at"]
+    df_campaigns = pd.DataFrame(column_names)
+
+
+
 
 
 
 
 else:
     print("Request was not redirected.")
-
-
