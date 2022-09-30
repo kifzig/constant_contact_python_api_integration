@@ -35,9 +35,6 @@ response = requests.get(URL, )
 #OAuth2 Authorization Code Flow
 #https://v3.developer.constantcontact.com/api_guide/server_flow.html
 
-#https://api.cc.email/v3/contacts?status=all&include_count=true&limit=50
-#https://api.cc.email/v3/contact_lists/{list_id}
-
 def getAuthorizationURL():
     baseURL = "https://authz.constantcontact.com/oauth2/default/v1/authorize"
     authURL = baseURL + "?client_id=" + CLIENT_ID_API_KEY + "&scope=" + SCOPE + "+offline_access&response_type=code&redirect_uri=" + REDIRECT_URL + "&state=" + STATE
@@ -117,7 +114,7 @@ if response.history:
     token_header = get_authorization_token_header(get_access_token(code))
     print(token_header)
 
-    ##Get User Privileges - 1st API Request GET
+    ##Get User Privileges - 1st API Request GET - These work, but need to be uncommented
     # user_priv_URL = "https://api.cc.email/v3/account/user/privileges"
     # r = requests.get(user_priv_URL, headers=token_header)
     # print("API - GET USER PRIVILEGES")
@@ -139,7 +136,7 @@ if response.history:
     new_list_id = r_json.get("list_id")
     print(f"list id = {new_list_id}")
 
-    #Delete a contact list
+    #Delete a contact list - Deletes the list made above
     del_list_url = f'https://api.cc.email/v3/contact_lists/{new_list_id}'
     r_del = requests.delete(del_list_url, headers=token_header)
     print(r_del.text)
